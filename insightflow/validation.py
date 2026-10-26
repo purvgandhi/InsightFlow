@@ -38,7 +38,8 @@ def _prepare(raw: pd.DataFrame) -> pd.DataFrame:
     df["_raw"] = [{k: (None if pd.isna(v) else v) for k, v in rec.items()}
                   for rec in raw.to_dict("records")]
     for col in raw.columns:
-        if df[col].dtype == object:
+        # pandas 3 reads text as the "str" dtype rather than object; handle both.
+        if df[col].dtype == object or pd.api.types.is_string_dtype(df[col]):
             df[col] = df[col].str.strip().replace("", pd.NA)
     return df
 
