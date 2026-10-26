@@ -5,6 +5,7 @@ unchanged. Inserts use ON CONFLICT DO NOTHING on the business keys, so
 re-running the same import is idempotent (no duplicate transactions).
 """
 
+import io
 import json
 from pathlib import Path
 
@@ -20,9 +21,15 @@ TXN_COLS = ["transaction_id", "customer_id", "merchant_id", "amount", "fee_amoun
 REFUND_COLS = ["refund_id", "transaction_id", "amount", "refunded_at", "reason"]
 
 
-def read_csv(path) -> pd.DataFrame:
+def read_csv(source) -> pd.DataFrame:
     # Read everything as text so validation (not pandas' type guessing) decides what is valid.
-    return pd.read_csv(path, dtype=str, keep_default_na=False, na_values=[""])
+    if isinstance(source, pd.DataFrame):
+        return source
+    if isinstance(source, (str, bytes)):
+        content = source if isinstance(source, str) else source.decode("utf-8", errors="replace")
+        if "\n" in content or ("," in content and not Path(content).exists()):
+            return pd.read_csv(io.StringIO(content), dtype=str, keep_default_na=False, na_values=[""])
+    return pd.read_csv(source, dtype=str, keep_default_na=False, na_values=[""])
 
 
 def _copy_insert(cur, table: str, cols: list[str], df: pd.DataFrame, conflict_key: str) -> int:
@@ -51,10 +58,19 @@ def _save_issues(cur, source_file: str, issues: pd.DataFrame) -> None:
           json.dumps(r.raw_record, default=str)) for r in issues.itertuples()])
 
 
-def run_pipeline(conn: psycopg.Connection, transactions_csv, refunds_csv, dataset_label: str,
-                 is_synthetic: bool, reset: bool = False, now: pd.Timestamp | None = None) -> dict:
-    txn_raw, refund_raw = read_csv(transactions_csv), read_csv(refunds_csv)
-    txn_name, refund_name = Path(transactions_csv).name, Path(refunds_csv).name
+def run_pipeline(conn: psycopg.Connection, transactions_csv, refunds_csv=None, dataset_label: str = "Imported dataset",
+                 is_synthetic: bool = False, reset: bool = False, now: pd.Timestamp | None = None) -> dict:
+    txn_raw = read_csv(transactions_csv)
+    txn_name = "transactions.csv"
+    if isinstance(transactions_csv, (str, Path)) and Path(str(transactions_csv)).exists():
+        txn_name = Path(str(transactions_csv)).name
+
+    if refunds_csv is not None:
+        refund_raw = read_csv(refunds_csv)
+        refund_name = Path(str(refunds_csv)).name if isinstance(refunds_csv, (str, Path)) and Path(str(refunds_csv)).exists() else "refunds.csv"
+    else:
+        refund_raw = pd.DataFrame(columns=REFUND_COLS)
+        refund_name = "refunds.csv"
 
     with conn.transaction(), conn.cursor() as cur:
         cur.execute(SCHEMA.read_text(encoding="utf-8"))

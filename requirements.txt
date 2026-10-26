@@ -1,5 +1,7 @@
-# Runtime dependencies for the Vercel Python Function (the API). Kept small on
-# purpose: Pandas is only needed by the import pipeline, not by the API.
+# Runtime dependencies for the Vercel Python Function (the API).
 fastapi==0.118.0
 psycopg[binary]==3.2.10
 psycopg-pool==3.2.6
+pandas>=2.2.0
+python-multipart>=0.0.9
+

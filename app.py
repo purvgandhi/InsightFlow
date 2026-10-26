@@ -3,20 +3,25 @@
 Run locally:  uvicorn app:app --reload   then open http://127.0.0.1:8000
 """
 
+import io
 import logging
 import os
 from contextlib import asynccontextmanager
 from datetime import date
+from io import StringIO
 from pathlib import Path
 from typing import Literal
 
+import pandas as pd
 import psycopg
-from fastapi import Depends, FastAPI, HTTPException, Query, Request
+from fastapi import Depends, FastAPI, File, Form, HTTPException, Query, Request, UploadFile
 from fastapi.responses import JSONResponse
 from psycopg_pool import PoolTimeout
 
 from insightflow import queries
-from insightflow.db import DatabaseNotConfigured, close_pool, fetch_one
+from insightflow.db import DatabaseNotConfigured, close_pool, fetch_one, get_pool
+from insightflow.pipeline import run_pipeline
+from insightflow.validation import TXN_REQUIRED, validate_transactions
 
 try:  # local development convenience; on Vercel env vars come from Project Settings
     from dotenv import load_dotenv
@@ -161,6 +166,138 @@ def anomalies(f: Filters = Depends()):
 @app.get("/api/data-quality")
 def data_quality():
     return queries.get_data_quality()
+
+
+MAX_UPLOAD_BYTES = 5 * 1024 * 1024  # 5 MB limit
+
+
+@app.post("/api/import/preview")
+async def preview_csv(file: UploadFile = File(...)):
+    """Inspect and validate an uploaded CSV without saving to the database."""
+    content = await file.read()
+    if len(content) > MAX_UPLOAD_BYTES:
+        raise HTTPException(413, "Uploaded file exceeds the maximum 5MB size limit.")
+    text = content.decode("utf-8", errors="replace").strip()
+    if not text:
+        raise HTTPException(422, "The uploaded CSV file is empty.")
+
+    try:
+        raw_df = pd.read_csv(StringIO(text), dtype=str, keep_default_na=False, na_values=[""])
+    except Exception as e:
+        raise HTTPException(422, f"Failed to parse CSV: {str(e)}")
+
+    if raw_df.empty:
+        raise HTTPException(422, "The uploaded CSV contains no data rows.")
+
+    found_cols = [c.strip() for c in raw_df.columns]
+    raw_df.columns = found_cols
+    missing_cols = [c for c in TXN_REQUIRED if c not in found_cols]
+
+    clean_df, issues_df = validate_transactions(raw_df)
+
+    issues_by_code = issues_df["issue_code"].value_counts().to_dict() if not issues_df.empty else {}
+    issues_sample = []
+    if not issues_df.empty:
+        for r in issues_df.head(20).itertuples():
+            issues_sample.append({
+                "row_number": int(r.row_number),
+                "record_id": str(r.record_id or ""),
+                "issue_code": str(r.issue_code),
+                "message": str(r.message),
+            })
+
+    # Sample rows for table preview
+    sample_rows = (clean_df if not clean_df.empty else raw_df).head(8)
+    preview_rows = sample_rows.to_dict("records")
+
+    return {
+        "filename": file.filename,
+        "total_rows": len(raw_df),
+        "valid_rows": len(clean_df),
+        "rejected_rows": int(issues_df["row_number"].nunique()) if not issues_df.empty else 0,
+        "columns": found_cols,
+        "missing_columns": missing_cols,
+        "issues_by_code": issues_by_code,
+        "issues_sample": issues_sample,
+        "preview_rows": preview_rows,
+        "can_import": len(clean_df) > 0 and len(missing_cols) == 0,
+    }
+
+
+@app.post("/api/import")
+async def import_csv(
+    file: UploadFile = File(...),
+    mode: Literal["replace", "append"] = Form("replace"),
+    dataset_label: str = Form(None)
+):
+    """Validate and import transactions into PostgreSQL, recalculating anomalies and metrics."""
+    content = await file.read()
+    if len(content) > MAX_UPLOAD_BYTES:
+        raise HTTPException(413, "Uploaded file exceeds the maximum 5MB size limit.")
+    text = content.decode("utf-8", errors="replace").strip()
+    if not text:
+        raise HTTPException(422, "The uploaded CSV file is empty.")
+
+    try:
+        raw_df = pd.read_csv(StringIO(text), dtype=str, keep_default_na=False, na_values=[""])
+    except Exception as e:
+        raise HTTPException(422, f"Failed to parse CSV: {str(e)}")
+
+    found_cols = [c.strip() for c in raw_df.columns]
+    raw_df.columns = found_cols
+    missing_cols = [c for c in TXN_REQUIRED if c not in found_cols]
+    if missing_cols:
+        raise HTTPException(422, f"Missing required columns: {', '.join(missing_cols)}")
+
+    clean_df, _ = validate_transactions(raw_df)
+    if clean_df.empty:
+        raise HTTPException(422, "All rows in the CSV failed validation. Check the preview for details.")
+
+    label = (dataset_label or f"Import: {file.filename}").strip()
+
+    with get_pool().connection() as conn:
+        summary = run_pipeline(
+            conn=conn,
+            transactions_csv=raw_df,
+            refunds_csv=None,
+            dataset_label=label,
+            is_synthetic=False,
+            reset=(mode == "replace")
+        )
+
+    return {
+        "status": "success",
+        "dataset_label": label,
+        "mode": mode,
+        "filename": file.filename,
+        "summary": summary,
+    }
+
+
+@app.post("/api/reset-demo")
+def reset_demo():
+    """Restore the database to the 6-month synthetic demo dataset."""
+    demo_txns = Path(__file__).parent / "data" / "sample_transactions.csv"
+    demo_refunds = Path(__file__).parent / "data" / "sample_refunds.csv"
+    if not demo_txns.exists() or not demo_refunds.exists():
+        raise HTTPException(500, "Demo dataset files not found on server.")
+
+    with get_pool().connection() as conn:
+        summary = run_pipeline(
+            conn=conn,
+            transactions_csv=demo_txns,
+            refunds_csv=demo_refunds,
+            dataset_label="Synthetic demo dataset (Apr to Sep 2026)",
+            is_synthetic=True,
+            reset=True
+        )
+
+    return {
+        "status": "success",
+        "message": "Dashboard restored to synthetic demo dataset (4,633 transactions).",
+        "summary": summary,
+    }
+
 
 
 # Locally, serve the dashboard from ./public. On Vercel, public/ is served by the CDN.

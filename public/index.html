@@ -45,11 +45,34 @@
           <input type="search" id="g-search" placeholder="Search transaction or customer ID…" aria-label="Search transactions">
           <kbd>/</kbd>
         </label>
+        <div class="topbar-actions">
+          <button type="button" id="btn-open-import" class="btn btn-import" title="Import custom transactions CSV">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+              <polyline points="17 8 12 3 7 8"></polyline>
+              <line x1="12" y1="3" x2="12" y2="15"></line>
+            </svg>
+            <span>Import CSV</span>
+          </button>
+          <button type="button" id="btn-reset-demo" class="btn btn-reset" title="Switch back to the synthetic demo dataset" hidden>
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path>
+              <path d="M3 3v5h5"></path>
+            </svg>
+            <span>Reset Demo Data</span>
+          </button>
+        </div>
         <div class="dataset" id="dataset" hidden>
           <span class="badge badge-demo" id="dataset-badge">Demo data</span>
           <span id="dataset-label"></span>
         </div>
       </header>
+
+      <div id="banner-notification" class="banner banner-success" hidden>
+        <span class="banner-icon" id="banner-icon">✓</span>
+        <span id="banner-msg"></span>
+        <button type="button" id="banner-close" class="banner-close-btn" aria-label="Dismiss">✕</button>
+      </div>
 
       <main>
         <!-- Hero -->
@@ -223,6 +246,122 @@
       <button value="close" aria-label="Close">✕</button>
     </form>
     <div id="d-body"></div>
+  </dialog>
+
+  <!-- Import CSV Modal -->
+  <dialog id="modal-import" class="modal-dialog" aria-labelledby="modal-import-title">
+    <div class="modal-head">
+      <div class="modal-head-title">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+          <polyline points="17 8 12 3 7 8"></polyline>
+          <line x1="12" y1="3" x2="12" y2="15"></line>
+        </svg>
+        <h2 id="modal-import-title">Import Transaction CSV</h2>
+      </div>
+      <button type="button" id="modal-import-close" class="modal-close" aria-label="Close">✕</button>
+    </div>
+
+    <div class="modal-body">
+      <!-- Dropzone / File Picker -->
+      <div class="dropzone" id="csv-dropzone">
+        <input type="file" id="csv-file-input" accept=".csv,text/csv" hidden>
+        <div class="dropzone-content">
+          <svg class="dropzone-icon" viewBox="0 0 24 24" width="36" height="36" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242M12 12v9m-4-4l4-4 4 4"></path>
+          </svg>
+          <p class="dropzone-text"><strong>Click to browse</strong> or drag & drop a transaction CSV</p>
+          <p class="dropzone-hint">Supports CSV files up to 5MB. Must include: <code>transaction_id</code>, <code>amount</code>, <code>status</code>, <code>created_at</code>, etc.</p>
+        </div>
+      </div>
+
+      <div class="sample-download-bar">
+        <span>Need a pre-formatted template?</span>
+        <a href="/sample_transactions.csv" download="sample_transactions.csv" class="sample-link">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"></path>
+          </svg>
+          Download Sample CSV Template (25 txns)
+        </a>
+      </div>
+
+      <!-- Preview Section -->
+      <div id="import-preview-section" hidden>
+        <div class="file-summary-bar">
+          <span class="file-name" id="prev-filename">transactions.csv</span>
+          <span class="file-status" id="prev-status-pill">Ready to validate</span>
+        </div>
+
+        <div class="preview-metrics">
+          <div class="p-card">
+            <span class="p-card-label">Total Rows</span>
+            <strong id="prev-total">0</strong>
+          </div>
+          <div class="p-card p-card-valid">
+            <span class="p-card-label">Valid Rows</span>
+            <strong id="prev-valid">0</strong>
+          </div>
+          <div class="p-card p-card-invalid">
+            <span class="p-card-label">Rejected Rows</span>
+            <strong id="prev-rejected">0</strong>
+          </div>
+        </div>
+
+        <div id="prev-error-box" class="error-box" hidden></div>
+
+        <!-- Issues preview if any -->
+        <div id="prev-issues-box" class="issues-box" hidden>
+          <h4>Validation Issues Found (<span id="prev-issues-count">0</span>)</h4>
+          <div class="table-wrap mini-table">
+            <table class="data">
+              <thead><tr><th>Row</th><th>Record ID</th><th>Code</th><th>Reason</th></tr></thead>
+              <tbody id="prev-issues-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Sample rows preview -->
+        <div class="sample-preview-box">
+          <h4>Data Preview (First 8 rows)</h4>
+          <div class="table-wrap mini-table">
+            <table class="data">
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Customer</th>
+                  <th>Merchant</th>
+                  <th>Amount</th>
+                  <th>Status</th>
+                  <th>Method</th>
+                  <th>Timestamp</th>
+                </tr>
+              </thead>
+              <tbody id="prev-sample-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Import options -->
+        <div class="import-options">
+          <label class="radio-label">
+            <input type="radio" name="import-mode" value="replace" checked>
+            <span><strong>Replace existing dataset</strong> (isolates imported data and recomputes all KPIs)</span>
+          </label>
+          <label class="radio-label">
+            <input type="radio" name="import-mode" value="append">
+            <span><strong>Append to current records</strong> (preserves existing data, skips duplicate IDs)</span>
+          </label>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal-foot">
+      <button type="button" id="btn-cancel-import" class="btn btn-secondary">Cancel</button>
+      <button type="button" id="btn-execute-import" class="btn btn-primary" disabled>
+        <span id="btn-import-text">Import Valid Records</span>
+        <span id="btn-import-spinner" class="spinner" hidden></span>
+      </button>
+    </div>
   </dialog>
 </body>
 </html>

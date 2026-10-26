@@ -51,9 +51,17 @@ def _parse_timestamp(series: pd.Series) -> pd.Series:
 def validate_transactions(raw: pd.DataFrame, now: pd.Timestamp | None = None):
     now = now or pd.Timestamp.now(tz="UTC")
     df = _prepare(raw)
-    df["status"] = df["status"].str.lower()
-    df["payment_method"] = df["payment_method"].str.lower()
-    df["currency"] = df["currency"].fillna("INR").str.upper()
+    for col in TXN_REQUIRED:
+        if col not in df.columns:
+            df[col] = pd.NA
+    if "currency" not in df.columns:
+        df["currency"] = "INR"
+    if "fee_amount" not in df.columns:
+        df["fee_amount"] = "0"
+
+    df["status"] = df["status"].fillna("").astype(str).str.lower().replace("", pd.NA)
+    df["payment_method"] = df["payment_method"].fillna("").astype(str).str.lower().replace("", pd.NA)
+    df["currency"] = df["currency"].fillna("INR").astype(str).str.upper()
     issues = []
 
     for col in TXN_REQUIRED:

@@ -3,9 +3,10 @@
   "functions": {
     "app.py": {
       "maxDuration": 15,
-      "excludeFiles": "{tests/**,data/**,scripts/**,public/**,.venv/**,**/__pycache__/**}"
+      "excludeFiles": "{tests/**,scripts/**,public/**,.venv/**,**/__pycache__/**}"
     }
   }
 }
+
 
 

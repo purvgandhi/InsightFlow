@@ -417,11 +417,19 @@ async function init() {
   }
   if (m.dataset) {
     $("#dataset").hidden = false;
-    $("#dataset-badge").hidden = !m.dataset.is_synthetic;
+    if (m.dataset.is_synthetic) {
+      $("#dataset-badge").className = "badge badge-demo";
+      $("#dataset-badge").textContent = "Demo Data";
+      $("#btn-reset-demo").hidden = true;
+    } else {
+      $("#dataset-badge").className = "badge badge-imported";
+      $("#dataset-badge").textContent = "Imported Data";
+      $("#btn-reset-demo").hidden = false;
+    }
     $("#dataset-label").textContent = m.dataset.dataset_label;
   }
-  $("#f-merchant").insertAdjacentHTML("beforeend", m.merchants.map((x) => `<option value="${esc(x)}">${esc(x)}</option>`).join(""));
-  $("#f-method").insertAdjacentHTML("beforeend", m.payment_methods.map((x) => `<option value="${esc(x)}">${x === "upi" ? "UPI" : esc(cap(x))}</option>`).join(""));
+  $("#f-merchant").innerHTML = '<option value="">All merchants</option>' + m.merchants.map((x) => `<option value="${esc(x)}">${esc(x)}</option>`).join("");
+  $("#f-method").innerHTML = '<option value="">All payment methods</option>' + m.payment_methods.map((x) => `<option value="${esc(x)}">${x === "upi" ? "UPI" : esc(cap(x))}</option>`).join("");
   for (const id of ["#f-start", "#f-end"]) { $(id).min = m.min_date; $(id).max = m.max_date; }
 
   if (state.filters.start && state.filters.end) {
@@ -498,7 +506,195 @@ document.addEventListener("keydown", (e) => {
   if (e.key === "/" && !["INPUT", "SELECT", "TEXTAREA"].includes(document.activeElement.tagName)) { e.preventDefault(); $("#g-search").focus(); }
 });
 
+function showBanner(msg, type = "success") {
+  const b = $("#banner-notification");
+  if (!b) return;
+  b.className = `banner banner-${type}`;
+  $("#banner-msg").textContent = msg;
+  $("#banner-icon").textContent = type === "success" ? "✓" : "✕";
+  b.hidden = false;
+  setTimeout(() => { b.hidden = true; }, 8000);
+}
+
+let currentImportFile = null;
+
+function setupImportModal() {
+  const modal = $("#modal-import");
+  const openBtn = $("#btn-open-import");
+  const closeBtn = $("#modal-import-close");
+  const cancelBtn = $("#btn-cancel-import");
+  const dropzone = $("#csv-dropzone");
+  const fileInput = $("#csv-file-input");
+  const execBtn = $("#btn-execute-import");
+  const resetBtn = $("#btn-reset-demo");
+  const bannerClose = $("#banner-close");
+
+  if (!modal || !openBtn) return;
+
+  if (bannerClose) {
+    bannerClose.addEventListener("click", () => {
+      const b = $("#banner-notification");
+      if (b) b.hidden = true;
+    });
+  }
+
+  openBtn.addEventListener("click", () => {
+    currentImportFile = null;
+    fileInput.value = "";
+    $("#import-preview-section").hidden = true;
+    execBtn.disabled = true;
+    modal.showModal();
+  });
+
+  const closeModal = () => modal.close();
+  closeBtn.addEventListener("click", closeModal);
+  cancelBtn.addEventListener("click", closeModal);
+  modal.addEventListener("click", (e) => { if (e.target === modal) closeModal(); });
+
+  dropzone.addEventListener("click", () => fileInput.click());
+  dropzone.addEventListener("dragover", (e) => { e.preventDefault(); dropzone.classList.add("dragover"); });
+  dropzone.addEventListener("dragleave", () => dropzone.classList.remove("dragover"));
+  dropzone.addEventListener("drop", (e) => {
+    e.preventDefault();
+    dropzone.classList.remove("dragover");
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]);
+  });
+  fileInput.addEventListener("change", (e) => {
+    if (e.target.files && e.target.files[0]) handleFile(e.target.files[0]);
+  });
+
+  async function handleFile(file) {
+    if (!file.name.toLowerCase().endsWith(".csv")) {
+      showError("Please select a valid .csv file.");
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      showError("File size exceeds 5MB limit.");
+      return;
+    }
+    currentImportFile = file;
+    $("#prev-filename").textContent = file.name;
+    $("#prev-status-pill").textContent = "Validating with Pandas...";
+    $("#import-preview-section").hidden = false;
+    $("#prev-error-box").hidden = true;
+    $("#prev-issues-box").hidden = true;
+    execBtn.disabled = true;
+
+    const fd = new FormData();
+    fd.append("file", file);
+
+    try {
+      const res = await fetch("/api/import/preview", { method: "POST", body: fd });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || "Validation failed");
+      }
+      const data = await res.json();
+      $("#prev-total").textContent = int.format(data.total_rows);
+      $("#prev-valid").textContent = int.format(data.valid_rows);
+      $("#prev-rejected").textContent = int.format(data.rejected_rows);
+
+      if (data.missing_columns && data.missing_columns.length > 0) {
+        $("#prev-error-box").textContent = `Missing required column(s): ${data.missing_columns.join(", ")}`;
+        $("#prev-error-box").hidden = false;
+        $("#prev-status-pill").textContent = "Missing Columns";
+        execBtn.disabled = true;
+      } else if (!data.can_import) {
+        $("#prev-error-box").textContent = "No valid rows could be imported. Please inspect the issues below.";
+        $("#prev-error-box").hidden = false;
+        $("#prev-status-pill").textContent = "Validation Failed";
+        execBtn.disabled = true;
+      } else {
+        $("#prev-status-pill").textContent = `${data.valid_rows} rows ready`;
+        execBtn.disabled = false;
+      }
+
+      // Render issues
+      if (data.issues_sample && data.issues_sample.length > 0) {
+        $("#prev-issues-box").hidden = false;
+        $("#prev-issues-count").textContent = data.rejected_rows;
+        $("#prev-issues-tbody").innerHTML = data.issues_sample.map((iss) => `
+          <tr>
+            <td class="num">${iss.row_number}</td>
+            <td><code>${esc(iss.record_id || "—")}</code></td>
+            <td><span class="badge" style="background:#fee2e2;color:#991b1b">${esc(iss.issue_code)}</span></td>
+            <td>${esc(iss.message)}</td>
+          </tr>
+        `).join("");
+      }
+
+      // Render preview rows
+      if (data.preview_rows && data.preview_rows.length > 0) {
+        $("#prev-sample-tbody").innerHTML = data.preview_rows.map((r) => `
+          <tr>
+            <td><code>${esc(r.transaction_id || "")}</code></td>
+            <td>${esc(r.customer_id || "")}</td>
+            <td>${esc(r.merchant_id || "")}</td>
+            <td class="num">${r.amount ? money(Number(r.amount)) : "—"}</td>
+            <td><span class="badge ${badgeClass(r.status)}">${esc(r.status || "")}</span></td>
+            <td>${esc(r.payment_method || "")}</td>
+            <td>${r.created_at ? dateTime(r.created_at) : "—"}</td>
+          </tr>
+        `).join("");
+      }
+    } catch (e) {
+      $("#prev-status-pill").textContent = "Error";
+      $("#prev-error-box").textContent = e.message;
+      $("#prev-error-box").hidden = false;
+      execBtn.disabled = true;
+    }
+  }
+
+  execBtn.addEventListener("click", async () => {
+    if (!currentImportFile) return;
+    execBtn.disabled = true;
+    $("#btn-import-spinner").hidden = false;
+    $("#btn-import-text").textContent = "Importing & Computing...";
+
+    const mode = document.querySelector('input[name="import-mode"]:checked')?.value || "replace";
+    const fd = new FormData();
+    fd.append("file", currentImportFile);
+    fd.append("mode", mode);
+
+    try {
+      const res = await fetch("/api/import", { method: "POST", body: fd });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || "Import execution failed");
+      }
+      const result = await res.json();
+      modal.close();
+      const loaded = result.summary?.transactions_inserted ?? result.summary?.rows_loaded ?? 0;
+      const issues = result.summary?.issues ?? 0;
+      showBanner(`Successfully imported ${int.format(loaded)} transactions (${int.format(issues)} issues/rejected). Dashboard recalculated!`);
+      init();
+    } catch (e) {
+      showError(e.message);
+    } finally {
+      execBtn.disabled = false;
+      $("#btn-import-spinner").hidden = true;
+      $("#btn-import-text").textContent = "Import Valid Records";
+    }
+  });
+
+  resetBtn.addEventListener("click", async () => {
+    if (!confirm("Restore the dashboard to the synthetic demo dataset (4,633 transactions)?")) return;
+    try {
+      const res = await fetch("/api/reset-demo", { method: "POST" });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || "Reset failed");
+      }
+      showBanner("Restored synthetic demo dataset (4,633 transactions).");
+      init();
+    } catch (e) {
+      showError(e.message);
+    }
+  });
+}
+
 window.addEventListener("DOMContentLoaded", () => {
   if (!window.Chart) { showError("Chart library failed to load. Check your connection and retry."); }
+  setupImportModal();
   init();
 });
