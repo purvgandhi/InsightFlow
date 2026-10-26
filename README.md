@@ -89,7 +89,8 @@ insightflow/pipeline.py     CSV → validate → COPY into Postgres → flag ano
 db/schema.sql               tables, constraints, indexes
 scripts/generate_sample_data.py   builds the synthetic dataset in data/
 scripts/load_data.py        CLI to import CSVs
-public/                     dashboard (index.html, styles.css, app.js)
+public/index.html           landing page (/) with a live snapshot (landing.css, landing.js)
+public/dashboard/           dashboard (/dashboard/); shared styles.css, app.js
 tests/                      pytest: validation, anomalies, KPI hand-calculation, pipeline idempotency, API errors
 ```
 
@@ -101,7 +102,7 @@ pip install -r requirements-dev.txt
 docker run -d --name insightflow-pg -e POSTGRES_PASSWORD=devpass -e POSTGRES_DB=insightflow -p 5433:5432 postgres:17
 cp .env.example .env   # set DATABASE_URL=postgresql://postgres:devpass@localhost:5433/insightflow
 python scripts/load_data.py --reset
-uvicorn app:app --reload   # http://127.0.0.1:8000  (API docs at /api/docs)
+uvicorn app:app --reload   # landing http://127.0.0.1:8000, dashboard /dashboard/, API docs /api/docs
 ```
 
 Tests (the KPI and pipeline tests need a throwaway database):
