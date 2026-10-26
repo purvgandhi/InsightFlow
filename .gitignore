@@ -22,3 +22,6 @@ Thumbs.db
 
 # Personal interview notes
 INTERVIEW_PREP.md
+
+.vercel
+.env*
