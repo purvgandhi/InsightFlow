@@ -5,128 +5,94 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>InsightFlow | FinTech Revenue Analytics</title>
   <meta name="description" content="Transaction, revenue, refund and data-quality analytics on PostgreSQL.">
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%2338bdf8'/%3E%3Cstop offset='1' stop-color='%232563eb'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='32' height='32' rx='9' fill='url(%23g)'/%3E%3Cpath d='M7 21l6-6 4 4 8-9' stroke='white' stroke-width='3' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%232563eb'/%3E%3Cpath d='M8 21l5-5 4 4 7-8' stroke='white' stroke-width='3' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/styles.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js" defer></script>
   <script src="/app.js" defer></script>
 </head>
 <body>
   <div class="shell">
-    <!-- Sidebar -->
     <aside class="sidebar">
       <a class="brand" href="#overview">
-        <span class="logo" aria-hidden="true"><svg viewBox="0 0 32 32"><path d="M7 21l6-6 4 4 8-9"/></svg></span>
-        <span class="brand-text">InsightFlow <span class="pro">Pro</span></span>
+        <span class="logo" aria-hidden="true"><svg viewBox="0 0 32 32"><path d="M8 21l5-5 4 4 7-8"/></svg></span>
+        <span class="brand-text">InsightFlow</span>
       </a>
-      <p class="nav-title">Analytics</p>
       <nav class="nav">
         <a href="#overview" class="active"><svg viewBox="0 0 24 24"><path d="M3 11l9-8 9 8v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg>Overview</a>
         <a href="#revenue"><svg viewBox="0 0 24 24"><path d="M4 19V9M10 19V5M16 19v-7M22 19H2"/></svg>Revenue</a>
         <a href="#records" data-open-tab="transactions"><svg viewBox="0 0 24 24"><path d="M6 3h9l5 5v13H6zM14 3v6h6M9 13h8M9 17h6"/></svg>Transactions</a>
         <a href="#records" data-open-tab="anomalies"><svg viewBox="0 0 24 24"><path d="M12 3l10 18H2zM12 10v4M12 17.5v.5"/></svg>Anomalies</a>
-        <a href="#records" data-open-tab="quality"><svg viewBox="0 0 24 24"><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6zM8.5 12l2.5 2.5 4.5-5"/></svg>Data quality</a>
+        <a href="#records" data-open-tab="quality"><svg viewBox="0 0 24 24"><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6zM8.5 12l2.5 2.5 4.5-5"/></svg>Data Quality</a>
         <a href="#records" data-open-tab="definitions"><svg viewBox="0 0 24 24"><path d="M4 5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2zM4 19V5M8 7h7"/></svg>Definitions</a>
       </nav>
-      <div class="side-card">
-        <p class="side-card-title">Powered by</p>
-        <p>PostgreSQL · SQL · Python · Pandas · FastAPI</p>
-        <a href="/api/docs" target="_blank" rel="noopener">Open API docs →</a>
-      </div>
     </aside>
 
     <div class="content">
-      <!-- Top bar -->
       <header class="topbar">
         <label class="global-search">
           <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
-          <input type="search" id="g-search" placeholder="Search transaction or customer ID…" aria-label="Search transactions">
-          <kbd>/</kbd>
+          <input type="search" id="g-search" placeholder="Search transaction or customer ID" aria-label="Search transactions">
         </label>
         <div class="topbar-actions">
-          <button type="button" id="btn-open-import" class="btn btn-import" title="Import custom transactions CSV">
-            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-              <polyline points="17 8 12 3 7 8"></polyline>
-              <line x1="12" y1="3" x2="12" y2="15"></line>
-            </svg>
-            <span>Import CSV</span>
+          <span class="dataset" id="dataset" hidden>
+            <span class="badge badge-demo" id="dataset-badge">Demo Data</span>
+            <span class="dataset-label" id="dataset-label"></span>
+          </span>
+          <button type="button" id="btn-reset-demo" class="btn btn-ghost" title="Restore the synthetic demo dataset">Reset Demo Data</button>
+          <button type="button" id="btn-open-import" class="btn btn-primary" title="Import a transactions CSV">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg>
+            Import CSV
           </button>
-          <button type="button" id="btn-reset-demo" class="btn btn-reset" title="Switch back to the synthetic demo dataset" hidden>
-            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path>
-              <path d="M3 3v5h5"></path>
-            </svg>
-            <span>Reset Demo Data</span>
-          </button>
-        </div>
-        <div class="dataset" id="dataset" hidden>
-          <span class="badge badge-demo" id="dataset-badge">Demo data</span>
-          <span id="dataset-label"></span>
         </div>
       </header>
 
-      <div id="banner-notification" class="banner banner-success" hidden>
-        <span class="banner-icon" id="banner-icon">✓</span>
-        <span id="banner-msg"></span>
-        <button type="button" id="banner-close" class="banner-close-btn" aria-label="Dismiss">✕</button>
-      </div>
-
       <main>
-        <!-- Hero -->
-        <section class="hero" id="overview">
-          <div class="hero-text">
-            <p class="crumbs">Dashboard <span>›</span> Overview</p>
-            <h1>Revenue overview</h1>
-            <p class="hero-sub">Live payments analytics: volume, refunds, revenue and data health, computed in PostgreSQL.</p>
+        <div id="banner-notification" class="banner banner-success" role="status" hidden>
+          <span class="banner-icon" id="banner-icon">✓</span>
+          <span id="banner-msg"></span>
+          <button type="button" id="banner-close" class="banner-close-btn" aria-label="Dismiss">✕</button>
+        </div>
+
+        <section class="page-head" id="overview">
+          <div>
+            <h1>Revenue Overview</h1>
+            <p class="page-sub">Monitor transaction performance, revenue, refunds, and data quality.</p>
           </div>
-          <div class="hero-stat">
-            <span>Gross transaction value</span>
-            <strong id="hero-gtv">—</strong>
-            <em id="hero-range">Loading…</em>
-          </div>
-          <div class="orb orb-1" aria-hidden="true"></div>
-          <div class="orb orb-2" aria-hidden="true"></div>
+          <p class="range-text" id="range-text"></p>
         </section>
 
-        <!-- Filters -->
         <section class="filters" aria-label="Filters">
-          <div class="presets" role="group" aria-label="Date range presets">
-            <button type="button" data-preset="30">Last 30 days</button>
-            <button type="button" data-preset="90">Last 90 days</button>
-            <button type="button" data-preset="all" class="active">All data</button>
+          <div class="seg" role="group" aria-label="Date range presets">
+            <button type="button" data-preset="30">30D</button>
+            <button type="button" data-preset="90">90D</button>
+            <button type="button" data-preset="all" class="active">All</button>
           </div>
-          <label>From <input type="date" id="f-start"></label>
-          <label>To <input type="date" id="f-end"></label>
-          <label>Merchant
-            <select id="f-merchant"><option value="">All merchants</option></select>
-          </label>
-          <label>Method
-            <select id="f-method"><option value="">All methods</option></select>
-          </label>
+          <label class="field"><span>From</span><input type="date" id="f-start"></label>
+          <label class="field"><span>To</span><input type="date" id="f-end"></label>
+          <label class="field"><span>Merchant</span><select id="f-merchant"><option value="">All merchants</option></select></label>
+          <label class="field"><span>Method</span><select id="f-method"><option value="">All methods</option></select></label>
         </section>
 
         <div class="banner banner-error" id="error" role="alert" hidden></div>
 
         <section class="kpis" id="kpis" aria-label="Key metrics" aria-busy="true"></section>
 
-        <!-- Charts -->
         <section class="grid-charts" id="revenue">
           <article class="card card-trend">
             <header class="card-head">
               <div>
-                <h2>Revenue trend</h2>
-                <p class="sub" id="trend-sub">Successful payment value, refunds and net value per period</p>
+                <h2>Revenue Trend</h2>
+                <div class="legend" id="trend-legend"></div>
               </div>
               <div class="seg" role="group" aria-label="Granularity">
-                <button type="button" data-gran="day">Daily</button>
-                <button type="button" data-gran="week" class="active">Weekly</button>
-                <button type="button" data-gran="month">Monthly</button>
+                <button type="button" data-gran="day">Day</button>
+                <button type="button" data-gran="week" class="active">Week</button>
+                <button type="button" data-gran="month">Month</button>
               </div>
             </header>
-            <div class="legend" id="trend-legend"></div>
             <div class="chart-box tall"><canvas id="trend-chart" role="img" aria-label="Revenue trend chart"></canvas></div>
             <details class="table-view">
               <summary>View as table</summary>
@@ -135,27 +101,28 @@
           </article>
 
           <article class="card card-donut">
-            <header class="card-head"><div><h2>Payment types</h2><p class="sub">Share of GTV by method</p></div></header>
-            <div class="donut-box">
-              <canvas id="method-chart" role="img" aria-label="Gross transaction value by payment method"></canvas>
-              <div class="donut-center"><strong id="donut-total">—</strong><span>Total GTV</span></div>
+            <header class="card-head"><h2>Payment Types</h2><span class="card-meta">Share of GTV</span></header>
+            <div class="donut-row">
+              <div class="donut-box">
+                <canvas id="method-chart" role="img" aria-label="Gross transaction value by payment method"></canvas>
+                <div class="donut-center"><strong id="donut-total">—</strong></div>
+              </div>
+              <ul class="donut-legend" id="method-legend"></ul>
             </div>
-            <ul class="donut-legend" id="method-legend"></ul>
           </article>
 
           <article class="card card-status">
-            <header class="card-head"><div><h2>Transaction status</h2><p class="sub">Count of attempts by outcome</p></div></header>
-            <div class="chart-box"><canvas id="status-chart" role="img" aria-label="Transactions by status"></canvas></div>
+            <header class="card-head"><h2>Transaction Status</h2><span class="card-meta">Attempts</span></header>
+            <div class="chart-box short"><canvas id="status-chart" role="img" aria-label="Transactions by status"></canvas></div>
           </article>
         </section>
 
-        <!-- Records -->
         <section class="card" id="records">
           <nav class="tabs" role="tablist">
-            <button role="tab" type="button" data-tab="transactions" class="active" aria-selected="true">Payments</button>
+            <button role="tab" type="button" data-tab="transactions" class="active" aria-selected="true">Transactions</button>
             <button role="tab" type="button" data-tab="anomalies" aria-selected="false">Anomalies <span class="count" id="anomaly-count"></span></button>
-            <button role="tab" type="button" data-tab="quality" aria-selected="false">Data quality <span class="count" id="quality-count"></span></button>
-            <button role="tab" type="button" data-tab="definitions" aria-selected="false">Metric definitions</button>
+            <button role="tab" type="button" data-tab="quality" aria-selected="false">Data Quality <span class="count" id="quality-count"></span></button>
+            <button role="tab" type="button" data-tab="definitions" aria-selected="false">Definitions</button>
           </nav>
 
           <div class="tab-panel" id="tab-transactions">
@@ -188,14 +155,14 @@
             <div class="pager">
               <span id="t-info"></span>
               <div>
-                <button type="button" id="t-prev">← Previous</button>
-                <button type="button" id="t-next">Next →</button>
+                <button type="button" class="btn btn-ghost" id="t-prev">Previous</button>
+                <button type="button" class="btn btn-ghost" id="t-next">Next</button>
               </div>
             </div>
           </div>
 
           <div class="tab-panel" id="tab-anomalies" hidden>
-            <p class="note">Valid transactions that match a suspicious pattern. They <strong>are</strong> counted in the KPIs and are listed here for review.</p>
+            <p class="note">Valid transactions that match a suspicious pattern. They are counted in the KPIs and listed here for review.</p>
             <div class="rule-cards" id="a-summary"></div>
             <div class="table-wrap">
               <table class="data">
@@ -206,7 +173,7 @@
           </div>
 
           <div class="tab-panel" id="tab-quality" hidden>
-            <p class="note">Records rejected by the Pandas validation step during import. They are <strong>not</strong> in the database tables or the KPIs. This list covers the whole import and ignores the date filters.</p>
+            <p class="note">Rows rejected by Pandas validation during import. They are excluded from the database and KPIs. Date filters don't apply here.</p>
             <div class="runs" id="q-runs"></div>
             <div class="rule-cards" id="q-summary"></div>
             <div class="table-wrap">
@@ -234,132 +201,81 @@
         </section>
 
         <footer class="foot">
-          InsightFlow · Data from PostgreSQL via FastAPI · <a href="/api/docs" target="_blank" rel="noopener">API docs</a>
+          InsightFlow · PostgreSQL · FastAPI · Pandas · <a href="/api/docs" target="_blank" rel="noopener">API docs</a>
         </footer>
       </main>
     </div>
   </div>
 
   <dialog id="drawer" aria-labelledby="d-title">
-    <form method="dialog" class="drawer-head">
-      <h2 id="d-title">Transaction</h2>
-      <button value="close" aria-label="Close">✕</button>
+    <form method="dialog" class="dialog-head">
+      <h2 id="d-title" class="mono">Transaction</h2>
+      <button value="close" class="icon-btn" aria-label="Close">✕</button>
     </form>
     <div id="d-body"></div>
   </dialog>
 
-  <!-- Import CSV Modal -->
   <dialog id="modal-import" class="modal-dialog" aria-labelledby="modal-import-title">
-    <div class="modal-head">
-      <div class="modal-head-title">
-        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-          <polyline points="17 8 12 3 7 8"></polyline>
-          <line x1="12" y1="3" x2="12" y2="15"></line>
-        </svg>
-        <h2 id="modal-import-title">Import Transaction CSV</h2>
-      </div>
-      <button type="button" id="modal-import-close" class="modal-close" aria-label="Close">✕</button>
+    <div class="dialog-head">
+      <h2 id="modal-import-title">Import transactions CSV</h2>
+      <button type="button" id="modal-import-close" class="icon-btn" aria-label="Close">✕</button>
     </div>
 
     <div class="modal-body">
-      <!-- Dropzone / File Picker -->
-      <div class="dropzone" id="csv-dropzone">
+      <div class="dropzone" id="csv-dropzone" role="button" tabindex="0">
         <input type="file" id="csv-file-input" accept=".csv,text/csv" hidden>
-        <div class="dropzone-content">
-          <svg class="dropzone-icon" viewBox="0 0 24 24" width="36" height="36" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242M12 12v9m-4-4l4-4 4 4"></path>
-          </svg>
-          <p class="dropzone-text"><strong>Click to browse</strong> or drag & drop a transaction CSV</p>
-          <p class="dropzone-hint">Supports CSV files up to 5MB. Must include: <code>transaction_id</code>, <code>amount</code>, <code>status</code>, <code>created_at</code>, etc.</p>
-        </div>
+        <p class="dropzone-text"><strong>Choose a CSV file</strong> or drag it here</p>
+        <p class="dropzone-hint">Max 5 MB. Required columns: <code>transaction_id</code>, <code>customer_id</code>, <code>merchant_id</code>, <code>amount</code>, <code>status</code>, <code>payment_method</code>, <code>created_at</code>.
+          <a href="/sample_transactions.csv" download="sample_transactions.csv" class="sample-link" id="sample-link">Download template</a></p>
       </div>
 
-      <div class="sample-download-bar">
-        <span>Need a pre-formatted template?</span>
-        <a href="/sample_transactions.csv" download="sample_transactions.csv" class="sample-link">
-          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"></path>
-          </svg>
-          Download Sample CSV Template (25 txns)
-        </a>
-      </div>
-
-      <!-- Preview Section -->
       <div id="import-preview-section" hidden>
         <div class="file-summary-bar">
-          <span class="file-name" id="prev-filename">transactions.csv</span>
-          <span class="file-status" id="prev-status-pill">Ready to validate</span>
+          <span class="file-name mono" id="prev-filename"></span>
+          <span class="file-status" id="prev-status-pill">Validating…</span>
         </div>
 
         <div class="preview-metrics">
-          <div class="p-card">
-            <span class="p-card-label">Total Rows</span>
-            <strong id="prev-total">0</strong>
-          </div>
-          <div class="p-card p-card-valid">
-            <span class="p-card-label">Valid Rows</span>
-            <strong id="prev-valid">0</strong>
-          </div>
-          <div class="p-card p-card-invalid">
-            <span class="p-card-label">Rejected Rows</span>
-            <strong id="prev-rejected">0</strong>
-          </div>
+          <div class="p-card"><span class="p-card-label">Total rows</span><strong id="prev-total">0</strong></div>
+          <div class="p-card p-card-valid"><span class="p-card-label">Valid</span><strong id="prev-valid">0</strong></div>
+          <div class="p-card p-card-invalid"><span class="p-card-label">Rejected</span><strong id="prev-rejected">0</strong></div>
         </div>
 
         <div id="prev-error-box" class="error-box" hidden></div>
 
-        <!-- Issues preview if any -->
         <div id="prev-issues-box" class="issues-box" hidden>
-          <h4>Validation Issues Found (<span id="prev-issues-count">0</span>)</h4>
+          <h4>Validation issues (<span id="prev-issues-count">0</span> rows)</h4>
           <div class="table-wrap mini-table">
             <table class="data">
-              <thead><tr><th>Row</th><th>Record ID</th><th>Code</th><th>Reason</th></tr></thead>
+              <thead><tr><th class="num">Row</th><th>Record</th><th>Code</th><th>Reason</th></tr></thead>
               <tbody id="prev-issues-tbody"></tbody>
             </table>
           </div>
         </div>
 
-        <!-- Sample rows preview -->
         <div class="sample-preview-box">
-          <h4>Data Preview (First 8 rows)</h4>
+          <h4>Preview (first 8 rows)</h4>
           <div class="table-wrap mini-table">
             <table class="data">
-              <thead>
-                <tr>
-                  <th>ID</th>
-                  <th>Customer</th>
-                  <th>Merchant</th>
-                  <th>Amount</th>
-                  <th>Status</th>
-                  <th>Method</th>
-                  <th>Timestamp</th>
-                </tr>
-              </thead>
+              <thead><tr><th>ID</th><th>Customer</th><th>Merchant</th><th class="num">Amount</th><th>Status</th><th>Method</th><th>Timestamp</th></tr></thead>
               <tbody id="prev-sample-tbody"></tbody>
             </table>
           </div>
         </div>
 
-        <!-- Import options -->
-        <div class="import-options">
-          <label class="radio-label">
-            <input type="radio" name="import-mode" value="replace" checked>
-            <span><strong>Replace existing dataset</strong> (isolates imported data and recomputes all KPIs)</span>
-          </label>
-          <label class="radio-label">
-            <input type="radio" name="import-mode" value="append">
-            <span><strong>Append to current records</strong> (preserves existing data, skips duplicate IDs)</span>
-          </label>
-        </div>
+        <fieldset class="import-options">
+          <legend>Import mode</legend>
+          <label class="radio-label"><input type="radio" name="import-mode" value="replace" checked> Replace current dataset</label>
+          <label class="radio-label"><input type="radio" name="import-mode" value="append"> Append (duplicate IDs are skipped)</label>
+        </fieldset>
       </div>
     </div>
 
     <div class="modal-foot">
-      <button type="button" id="btn-cancel-import" class="btn btn-secondary">Cancel</button>
+      <button type="button" id="btn-cancel-import" class="btn btn-ghost">Cancel</button>
       <button type="button" id="btn-execute-import" class="btn btn-primary" disabled>
-        <span id="btn-import-text">Import Valid Records</span>
         <span id="btn-import-spinner" class="spinner" hidden></span>
+        <span id="btn-import-text">Import valid rows</span>
       </button>
     </div>
   </dialog>

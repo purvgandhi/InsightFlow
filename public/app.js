@@ -77,55 +77,42 @@ function writeUrl() {
 }
 
 // ---------- KPI tiles ----------
-const ICONS = {
-  count: '<path d="M4 6h16M4 12h16M4 18h10"/>',
-  wallet: '<path d="M3 7a2 2 0 0 1 2-2h13v4M3 7v10a2 2 0 0 0 2 2h15V9H5a2 2 0 0 1-2-2zM16 14h.01"/>',
-  refund: '<path d="M9 14L4 9l5-5M4 9h11a5 5 0 0 1 0 10h-3"/>',
-  percent: '<path d="M19 5L5 19M7 9a2 2 0 1 0 0-4 2 2 0 0 0 0 4zM17 19a2 2 0 1 0 0-4 2 2 0 0 0 0 4z"/>',
-  net: '<path d="M6 4h12M6 9h12M9 4c4 0 6 2 6 5s-2 5-6 5H6l9 7"/>',
-  revenue: '<path d="M3 17l6-6 4 4 8-8M15 7h6v6"/>',
-  avg: '<path d="M4 20V10M10 20V4M16 20v-8M3 20h18"/>',
-  check: '<path d="M20 6L9 17l-5-5"/>',
-};
 const KPI_TILES = [
-  { key: "gtv", label: "Gross transaction value", icon: "wallet", fmt: (k) => money(k.gtv), highlight: true,
-    hint: () => "Successful payments, before refunds", formula: "SUM(amount) WHERE status = 'success'" },
-  { key: "total_transactions", label: "Total transactions", icon: "count", fmt: (k) => int.format(k.total_transactions),
-    hint: (k) => `${int.format(k.successful)} successful · ${int.format(k.failed)} failed · ${int.format(k.pending + k.cancelled)} pending/cancelled`,
+  { label: "Gross Transaction Value", fmt: (k) => money(k.gtv),
+    hint: () => "Successful payments", formula: "SUM(amount) WHERE status = 'success', before refunds" },
+  { label: "Total Transactions", fmt: (k) => int.format(k.total_transactions),
+    hint: (k) => `${int.format(k.successful)} successful · ${int.format(k.failed)} failed`,
     formula: "COUNT(*) of all payment attempts in the range, any status" },
-  { key: "refund_amount", label: "Refund amount", icon: "refund", fmt: (k) => money(k.refund_amount),
-    hint: (k) => `${int.format(k.refunded_transactions)} payments refunded`, formula: "SUM(refund amount) for successful payments made in the range" },
-  { key: "refund_rate", label: "Refund rate", icon: "percent", fmt: (k) => pct(k.refund_rate, 2),
-    hint: (k) => `By value · ${pct(k.refund_count_rate)} by count`, formula: "Refund amount ÷ GTV" },
-  { key: "net_transaction_value", label: "Net transaction value", icon: "net", fmt: (k) => money(k.net_transaction_value),
-    hint: () => "GTV minus refunds", formula: "GTV − refund amount" },
-  { key: "net_revenue", label: "Net revenue (fees)", icon: "revenue", fmt: (k) => money2(k.net_revenue),
-    hint: (k) => `${money(k.fee_revenue)} fees − ${money(k.fee_reversed)} reversed`, formula: "SUM(fee_amount) of successful payments − fees reversed pro-rata on refunds" },
-  { key: "aov", label: "Avg transaction value", icon: "avg", fmt: (k) => money2(k.aov),
+  { label: "Refund Amount", fmt: (k) => money(k.refund_amount),
+    hint: (k) => `${int.format(k.refunded_transactions)} refunded payments`, formula: "SUM(refund amount) for successful payments made in the range" },
+  { label: "Refund Rate", fmt: (k) => pct(k.refund_rate, 2),
+    hint: (k) => `Of GTV · ${pct(k.refund_count_rate)} by count`, formula: "Refund amount ÷ GTV" },
+  { label: "Net Transaction Value", fmt: (k) => money(k.net_transaction_value),
+    hint: () => "GTV − refunds", formula: "GTV − refund amount (merchant money, not platform revenue)" },
+  { label: "Net Revenue", fmt: (k) => money(k.net_revenue),
+    hint: () => "Fees after reversals", formula: `SUM(fee_amount) of successful payments − fees reversed pro-rata on refunds` },
+  { label: "Avg Transaction Value", fmt: (k) => money2(k.aov),
     hint: () => "Per successful payment", formula: "GTV ÷ number of successful payments" },
-  { key: "success_rate", label: "Success rate", icon: "check", fmt: (k) => pct(k.success_rate),
-    hint: () => "Pending & cancelled excluded", formula: "successful ÷ (successful + failed)" },
+  { label: "Success Rate", fmt: (k) => pct(k.success_rate),
+    hint: () => "Excl. pending & cancelled", formula: "successful ÷ (successful + failed)" },
 ];
-const icon = (name) => `<span class="icon" aria-hidden="true"><svg viewBox="0 0 24 24">${ICONS[name]}</svg></span>`;
 
 function renderKpiSkeleton() {
   $("#kpis").setAttribute("aria-busy", "true");
   $("#kpis").innerHTML = KPI_TILES.map((t) => `
-    <div class="kpi${t.highlight ? " highlight" : ""}">${icon(t.icon)}<div class="label">${t.label}</div>
-      <div class="skeleton" style="height:30px;width:70%"></div><div class="skeleton" style="height:12px;width:50%"></div></div>`).join("");
+    <div class="kpi"><div class="label">${t.label}</div>
+      <div class="skeleton" style="height:24px;width:60%"></div><div class="skeleton" style="height:10px;width:40%"></div></div>`).join("");
 }
 function renderKpis(k) {
   $("#kpis").setAttribute("aria-busy", "false");
   $("#kpis").innerHTML = KPI_TILES.map((t) => `
-    <div class="kpi${t.highlight ? " highlight" : ""}">
-      ${icon(t.icon)}
+    <div class="kpi">
       <div class="label">${t.label}<span class="info" title="${esc(t.formula)}" aria-label="Formula: ${esc(t.formula)}">i</span></div>
       <div class="value">${t.fmt(k)}</div>
-      <div class="hint">${esc(t.hint(k))}</div>
+      <div class="hint" title="${esc(t.hint(k))}">${esc(t.hint(k))}</div>
     </div>`).join("");
-  $("#hero-gtv").textContent = money(k.gtv);
   const fmtDay = (d) => new Date(`${d}T00:00:00Z`).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric", timeZone: "UTC" });
-  $("#hero-range").textContent = `${fmtDay(state.filters.start)} – ${fmtDay(state.filters.end)} · ${int.format(k.successful)} successful payments`;
+  $("#range-text").textContent = `${fmtDay(state.filters.start)} – ${fmtDay(state.filters.end)} (IST)`;
 }
 
 // ---------- charts ----------
@@ -160,22 +147,13 @@ function drawChart(id, config) {
   state.charts[id] = new Chart(document.getElementById(id), config);
 }
 
-function areaGradient(ctx) {
-  const { chart } = ctx;
-  if (!chart.chartArea) return "rgba(56, 189, 248, 0.2)";
-  const g = chart.ctx.createLinearGradient(0, chart.chartArea.top, 0, chart.chartArea.bottom);
-  g.addColorStop(0, "rgba(56, 189, 248, 0.38)");
-  g.addColorStop(1, "rgba(56, 189, 248, 0.02)");
-  return g;
-}
-
 function renderTrend(data) {
   state.lastTrend = data;
   const s = data.series;
   const series = [
-    { label: "Gross transaction value", key: "gtv", color: css("--series-1") },
+    { label: "GTV", key: "gtv", color: css("--series-1") },
+    { label: "Net value", key: "net_transaction_value", color: css("--series-3") },
     { label: "Refunds", key: "refund_amount", color: css("--series-2") },
-    { label: "Net transaction value", key: "net_transaction_value", color: css("--series-3") },
   ];
   $("#trend-legend").innerHTML = series.map((x) => `<span><i style="background:${x.color}"></i>${x.label}</span>`).join("");
   const empty = !s.length || s.every((r) => r.gtv === 0);
@@ -187,7 +165,7 @@ function renderTrend(data) {
   };
   const partialNote = s.some((r) => r.partial);
   $("#trend-legend").insertAdjacentHTML("beforeend", partialNote
-    ? `<span style="color:var(--muted)">* partial period: cut off by the date range</span>` : "");
+    ? `<span style="color:var(--muted)">* partial period</span>` : "");
   if (!empty) {
     drawChart("trend-chart", {
       type: "line",
@@ -195,10 +173,10 @@ function renderTrend(data) {
         labels: s.map((r) => `${bucketLabel(r.bucket, data.granularity)}${r.partial ? "*" : ""}`),
         datasets: series.map((x, i) => ({
           label: x.label, data: s.map((r) => r[x.key]), borderColor: x.color, pointBackgroundColor: x.color,
-          // GTV is drawn as a soft light-blue area; refunds and net value stay as lines on the same ₹ axis.
+          // GTV gets a faint fill for emphasis; all three share one ₹ axis.
           fill: i === 0 ? "origin" : false,
-          backgroundColor: i === 0 ? areaGradient : x.color,
-          borderWidth: i === 0 ? 2.5 : 2, tension: 0.35, pointRadius: s.length > 40 ? 0 : 3, pointHoverRadius: 5,
+          backgroundColor: i === 0 ? "rgba(37, 99, 235, 0.06)" : x.color,
+          borderWidth: 2, tension: 0.3, pointRadius: 0, pointHoverRadius: 4,
           pointBorderColor: css("--surface"), pointBorderWidth: 2,
         })),
       },
@@ -228,7 +206,7 @@ function renderBreakdowns(b) {
       type: "bar",
       data: { labels: st.map((r) => cap(r.status)),
               datasets: [{ data: st.map((r) => r.transactions), backgroundColor: st.map((r) => css(STATUS_COLOR[r.status] || "--neutral")),
-                           borderRadius: 4, borderSkipped: "start", barThickness: 22 }] },
+                           borderRadius: 3, borderSkipped: "start", barThickness: 14 }] },
       options: o,
     });
   }
@@ -238,19 +216,19 @@ function renderBreakdowns(b) {
   $(".donut-center").hidden = !m.length;
   setEmpty("method-chart", !m.length);
   $("#method-legend").innerHTML = m.map((r) => `
-    <li><i style="background:${methodColor(r.payment_method)}"></i><span>${methodLabel(r.payment_method)}</span>
-      <span class="v">${money(r.gtv)}</span><span class="p">${pct(r.gtv / total)}</span></li>`).join("");
+    <li title="${money(r.gtv)}"><i style="background:${methodColor(r.payment_method)}"></i><span>${methodLabel(r.payment_method)}</span>
+      <span class="p">${pct(r.gtv / total)}</span></li>`).join("");
   if (m.length) {
     const o = baseOptions();
     delete o.scales;
-    o.cutout = "68%";
+    o.cutout = "72%";
     o.interaction = { mode: "nearest", intersect: true };
     o.plugins.tooltip.callbacks = { label: (c) => ` ${money(c.parsed)} · ${pct(c.parsed / total)} · ${int.format(m[c.dataIndex].successful)} payments` };
     drawChart("method-chart", {
       type: "doughnut",
       data: { labels: m.map((r) => methodLabel(r.payment_method)),
               datasets: [{ data: m.map((r) => r.gtv), backgroundColor: m.map((r) => methodColor(r.payment_method)),
-                           borderColor: css("--surface"), borderWidth: 3, borderRadius: 6, hoverOffset: 6 }] },
+                           borderColor: css("--surface"), borderWidth: 2, hoverOffset: 3 }] },
       options: o,
     });
   }
@@ -273,9 +251,9 @@ async function loadTransactions(signal) {
     sort, order, page: t.page, page_size: t.pageSize }, signal);
   $("#t-body").innerHTML = data.items.length ? data.items.map((r) => `
     <tr class="clickable" data-id="${esc(r.transaction_id)}" tabindex="0">
-      <td><span class="id-pill">${esc(r.transaction_id)}</span></td><td>${dateTime(r.created_at)}</td><td><span class="id-pill">${esc(r.customer_id)}</span></td>
+      <td class="mono">${esc(r.transaction_id)}</td><td>${dateTime(r.created_at)}</td><td class="mono">${esc(r.customer_id)}</td>
       <td>${esc(r.merchant_id)}</td><td>${esc(methodLabel(r.payment_method))}</td><td>${statusPill(r.status)}</td>
-      <td class="num"><span class="amt-pill">${money2(r.amount)}</span></td><td class="num">${r.refunded_amount ? money2(r.refunded_amount) : "—"}</td>
+      <td class="num">${money2(r.amount)}</td><td class="num">${r.refunded_amount ? money2(r.refunded_amount) : "—"}</td>
       <td>${flagChips(r.flags)}</td>
     </tr>`).join("") : `<tr><td colspan="9"><div class="empty">No transactions match these filters</div></td></tr>`;
   const from = data.total ? (data.page - 1) * data.page_size + 1 : 0;
@@ -301,7 +279,7 @@ async function openDrilldown(id) {
         <dt>Date (IST)</dt><dd>${dateTime(t.created_at)}</dd>
         <dt>Customer</dt><dd class="mono">${esc(t.customer_id)}</dd>
         <dt>Merchant</dt><dd>${esc(t.merchant_id)}</dd>
-        <dt>Method</dt><dd>${esc(t.payment_method)}</dd>
+        <dt>Method</dt><dd>${esc(methodLabel(t.payment_method))}</dd>
       </dl>
       <div><h3>Refunds</h3>${t.refunds.length ? `<div class="table-wrap"><table><thead><tr><th>Refund</th><th>Date (IST)</th><th>Reason</th><th class="num">Amount</th></tr></thead>
         <tbody>${t.refunds.map((r) => `<tr><td class="mono">${esc(r.refund_id)}</td><td>${dateTime(r.refunded_at)}</td><td>${esc(r.reason || "—")}</td><td class="num">${money2(r.amount)}</td></tr>`).join("")}</tbody></table></div>`
@@ -417,19 +395,12 @@ async function init() {
   }
   if (m.dataset) {
     $("#dataset").hidden = false;
-    if (m.dataset.is_synthetic) {
-      $("#dataset-badge").className = "badge badge-demo";
-      $("#dataset-badge").textContent = "Demo Data";
-      $("#btn-reset-demo").hidden = true;
-    } else {
-      $("#dataset-badge").className = "badge badge-imported";
-      $("#dataset-badge").textContent = "Imported Data";
-      $("#btn-reset-demo").hidden = false;
-    }
+    $("#dataset-badge").className = `badge ${m.dataset.is_synthetic ? "badge-demo" : "badge-imported"}`;
+    $("#dataset-badge").textContent = m.dataset.is_synthetic ? "Demo Data" : "Imported Data";
     $("#dataset-label").textContent = m.dataset.dataset_label;
   }
   $("#f-merchant").innerHTML = '<option value="">All merchants</option>' + m.merchants.map((x) => `<option value="${esc(x)}">${esc(x)}</option>`).join("");
-  $("#f-method").innerHTML = '<option value="">All payment methods</option>' + m.payment_methods.map((x) => `<option value="${esc(x)}">${x === "upi" ? "UPI" : esc(cap(x))}</option>`).join("");
+  $("#f-method").innerHTML = '<option value="">All methods</option>' + m.payment_methods.map((x) => `<option value="${esc(x)}">${x === "upi" ? "UPI" : esc(cap(x))}</option>`).join("");
   for (const id of ["#f-start", "#f-end"]) { $(id).min = m.min_date; $(id).max = m.max_date; }
 
   if (state.filters.start && state.filters.end) {
@@ -513,10 +484,20 @@ function showBanner(msg, type = "success") {
   $("#banner-msg").textContent = msg;
   $("#banner-icon").textContent = type === "success" ? "✓" : "✕";
   b.hidden = false;
-  setTimeout(() => { b.hidden = true; }, 8000);
+  clearTimeout(showBanner.timer);  // a newer message must not be hidden by an older message's timer
+  showBanner.timer = setTimeout(() => { b.hidden = true; }, 8000);
 }
 
 let currentImportFile = null;
+
+// After the dataset changes, the old date range / merchant may not exist in the new data,
+// so drop them and let init() pick the new data's full range.
+function reloadForNewDataset() {
+  state.filters = { start: "", end: "", merchant: "", method: "" };
+  state.table.page = 1;
+  history.replaceState(null, "", location.pathname);
+  init();
+}
 
 function setupImportModal() {
   const modal = $("#modal-import");
@@ -551,7 +532,8 @@ function setupImportModal() {
   cancelBtn.addEventListener("click", closeModal);
   modal.addEventListener("click", (e) => { if (e.target === modal) closeModal(); });
 
-  dropzone.addEventListener("click", () => fileInput.click());
+  dropzone.addEventListener("click", (e) => { if (!e.target.closest("a")) fileInput.click(); });
+  dropzone.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); fileInput.click(); } });
   dropzone.addEventListener("dragover", (e) => { e.preventDefault(); dropzone.classList.add("dragover"); });
   dropzone.addEventListener("dragleave", () => dropzone.classList.remove("dragover"));
   dropzone.addEventListener("drop", (e) => {
@@ -564,20 +546,28 @@ function setupImportModal() {
   });
 
   async function handleFile(file) {
-    if (!file.name.toLowerCase().endsWith(".csv")) {
-      showError("Please select a valid .csv file.");
-      return;
-    }
-    if (file.size > 5 * 1024 * 1024) {
-      showError("File size exceeds 5MB limit.");
-      return;
-    }
+    // Errors are shown inside the dialog, not in the page banner hidden behind it.
+    const reject = (msg) => {
+      currentImportFile = null;
+      $("#import-preview-section").hidden = false;
+      $("#prev-filename").textContent = file.name;
+      $("#prev-status-pill").textContent = "Not accepted";
+      for (const id of ["#prev-total", "#prev-valid", "#prev-rejected"]) $(id).textContent = "0";
+      $("#prev-issues-box").hidden = true;
+      $("#prev-sample-tbody").innerHTML = "";
+      $("#prev-error-box").textContent = msg;
+      $("#prev-error-box").hidden = false;
+      execBtn.disabled = true;
+    };
+    if (!file.name.toLowerCase().endsWith(".csv")) return reject("Please select a .csv file.");
+    if (file.size > 5 * 1024 * 1024) return reject("File is larger than the 5 MB limit.");
     currentImportFile = file;
     $("#prev-filename").textContent = file.name;
-    $("#prev-status-pill").textContent = "Validating with Pandas...";
+    $("#prev-status-pill").textContent = "Validating…";
     $("#import-preview-section").hidden = false;
     $("#prev-error-box").hidden = true;
     $("#prev-issues-box").hidden = true;
+    $("#prev-sample-tbody").innerHTML = "";
     execBtn.disabled = true;
 
     const fd = new FormData();
@@ -617,7 +607,7 @@ function setupImportModal() {
           <tr>
             <td class="num">${iss.row_number}</td>
             <td><code>${esc(iss.record_id || "—")}</code></td>
-            <td><span class="badge" style="background:#fee2e2;color:#991b1b">${esc(iss.issue_code)}</span></td>
+            <td class="issue-code">${esc(iss.issue_code)}</td>
             <td>${esc(iss.message)}</td>
           </tr>
         `).join("");
@@ -631,7 +621,7 @@ function setupImportModal() {
             <td>${esc(r.customer_id || "")}</td>
             <td>${esc(r.merchant_id || "")}</td>
             <td class="num">${r.amount ? money(Number(r.amount)) : "—"}</td>
-            <td><span class="badge ${badgeClass(r.status)}">${esc(r.status || "")}</span></td>
+            <td>${r.status ? statusPill(String(r.status).toLowerCase()) : "—"}</td>
             <td>${esc(r.payment_method || "")}</td>
             <td>${r.created_at ? dateTime(r.created_at) : "—"}</td>
           </tr>
@@ -649,7 +639,7 @@ function setupImportModal() {
     if (!currentImportFile) return;
     execBtn.disabled = true;
     $("#btn-import-spinner").hidden = false;
-    $("#btn-import-text").textContent = "Importing & Computing...";
+    $("#btn-import-text").textContent = "Importing…";
 
     const mode = document.querySelector('input[name="import-mode"]:checked')?.value || "replace";
     const fd = new FormData();
@@ -667,26 +657,28 @@ function setupImportModal() {
       const loaded = result.summary?.transactions_inserted ?? result.summary?.rows_loaded ?? 0;
       const issues = result.summary?.issues ?? 0;
       showBanner(`Successfully imported ${int.format(loaded)} transactions (${int.format(issues)} issues/rejected). Dashboard recalculated!`);
-      init();
+      reloadForNewDataset();
     } catch (e) {
       showError(e.message);
     } finally {
       execBtn.disabled = false;
       $("#btn-import-spinner").hidden = true;
-      $("#btn-import-text").textContent = "Import Valid Records";
+      $("#btn-import-text").textContent = "Import valid rows";
     }
   });
 
   resetBtn.addEventListener("click", async () => {
-    if (!confirm("Restore the dashboard to the synthetic demo dataset (4,633 transactions)?")) return;
+    if (!confirm("Replace the current data with the synthetic demo dataset?")) return;
     try {
       const res = await fetch("/api/reset-demo", { method: "POST" });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
         throw new Error(err.detail || "Reset failed");
       }
-      showBanner("Restored synthetic demo dataset (4,633 transactions).");
-      init();
+      const result = await res.json();
+      const n = result.summary?.transactions_inserted;
+      showBanner(`Demo dataset restored${n !== undefined ? ` (${int.format(n)} transactions)` : ""}.`);
+      reloadForNewDataset();
     } catch (e) {
       showError(e.message);
     }
