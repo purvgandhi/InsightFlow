@@ -1,0 +1,7 @@
+# Local development: API + data pipeline + tests
+-r requirements.txt
+pandas==2.3.3
+uvicorn==0.37.0
+python-dotenv==1.1.1
+pytest==8.4.2
+httpx==0.28.1

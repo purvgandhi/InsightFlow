@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>InsightFlow | FinTech Revenue Analytics</title>
+  <meta name="description" content="Transaction, revenue, refund and data-quality analytics on PostgreSQL.">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%232a78d6'/%3E%3Cpath d='M7 21l6-6 4 4 8-9' stroke='white' stroke-width='3' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="/styles.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js" defer></script>
+  <script src="/app.js" defer></script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="logo" aria-hidden="true">
+        <svg viewBox="0 0 32 32"><rect width="32" height="32" rx="8"/><path d="M7 21l6-6 4 4 8-9"/></svg>
+      </span>
+      <div>
+        <h1>InsightFlow</h1>
+        <p>FinTech Revenue Analytics</p>
+      </div>
+    </div>
+    <div class="dataset" id="dataset" hidden>
+      <span class="badge badge-demo" id="dataset-badge">Demo data</span>
+      <span id="dataset-label"></span>
+    </div>
+  </header>
+
+  <main>
+    <section class="filters" aria-label="Filters">
+      <div class="presets" role="group" aria-label="Date range presets">
+        <button type="button" data-preset="30">Last 30 days</button>
+        <button type="button" data-preset="90">Last 90 days</button>
+        <button type="button" data-preset="all" class="active">All data</button>
+      </div>
+      <label>From <input type="date" id="f-start"></label>
+      <label>To <input type="date" id="f-end"></label>
+      <label>Merchant
+        <select id="f-merchant"><option value="">All merchants</option></select>
+      </label>
+      <label>Method
+        <select id="f-method"><option value="">All methods</option></select>
+      </label>
+    </section>
+
+    <div class="banner banner-error" id="error" role="alert" hidden></div>
+
+    <section class="kpis" id="kpis" aria-label="Key metrics" aria-busy="true">
+      <!-- filled by app.js -->
+    </section>
+
+    <section class="grid-charts">
+      <article class="card card-wide">
+        <header class="card-head">
+          <div>
+            <h2>Revenue trend</h2>
+            <p class="sub">Successful payment value, refunds and net value per period</p>
+          </div>
+          <div class="seg" role="group" aria-label="Granularity">
+            <button type="button" data-gran="day">Daily</button>
+            <button type="button" data-gran="week" class="active">Weekly</button>
+            <button type="button" data-gran="month">Monthly</button>
+          </div>
+        </header>
+        <div class="legend" id="trend-legend"></div>
+        <div class="chart-box tall"><canvas id="trend-chart" role="img" aria-label="Revenue trend chart"></canvas></div>
+        <details class="table-view">
+          <summary>View as table</summary>
+          <div class="table-wrap"><table id="trend-table"></table></div>
+        </details>
+      </article>
+
+      <article class="card">
+        <header class="card-head"><div><h2>Transaction status</h2><p class="sub">Count of attempts by outcome</p></div></header>
+        <div class="chart-box"><canvas id="status-chart" role="img" aria-label="Transactions by status"></canvas></div>
+      </article>
+
+      <article class="card">
+        <header class="card-head"><div><h2>GTV by payment method</h2><p class="sub">Successful payments only</p></div></header>
+        <div class="chart-box"><canvas id="method-chart" role="img" aria-label="Gross transaction value by payment method"></canvas></div>
+      </article>
+    </section>
+
+    <section class="card">
+      <nav class="tabs" role="tablist">
+        <button role="tab" type="button" data-tab="transactions" class="active" aria-selected="true">Transactions</button>
+        <button role="tab" type="button" data-tab="anomalies" aria-selected="false">Anomalies <span class="count" id="anomaly-count"></span></button>
+        <button role="tab" type="button" data-tab="quality" aria-selected="false">Data quality <span class="count" id="quality-count"></span></button>
+        <button role="tab" type="button" data-tab="definitions" aria-selected="false">Metric definitions</button>
+      </nav>
+
+      <div class="tab-panel" id="tab-transactions">
+        <div class="toolbar">
+          <input type="search" id="t-search" placeholder="Search transaction or customer ID" aria-label="Search">
+          <select id="t-status" aria-label="Status">
+            <option value="">All statuses</option>
+            <option value="success">Success</option>
+            <option value="failed">Failed</option>
+            <option value="pending">Pending</option>
+            <option value="cancelled">Cancelled</option>
+          </select>
+          <select id="t-sort" aria-label="Sort">
+            <option value="created_at:desc">Newest first</option>
+            <option value="created_at:asc">Oldest first</option>
+            <option value="amount:desc">Highest amount</option>
+            <option value="amount:asc">Lowest amount</option>
+          </select>
+          <label class="check"><input type="checkbox" id="t-flagged"> Flagged only</label>
+        </div>
+        <div class="table-wrap">
+          <table class="data">
+            <thead><tr>
+              <th>Transaction</th><th>Date (IST)</th><th>Customer</th><th>Merchant</th><th>Method</th>
+              <th>Status</th><th class="num">Amount</th><th class="num">Refunded</th><th>Flags</th>
+            </tr></thead>
+            <tbody id="t-body"></tbody>
+          </table>
+        </div>
+        <div class="pager">
+          <span id="t-info"></span>
+          <div>
+            <button type="button" id="t-prev">Previous</button>
+            <button type="button" id="t-next">Next</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="tab-panel" id="tab-anomalies" hidden>
+        <p class="note">Valid transactions that match a suspicious pattern. They <strong>are</strong> counted in the KPIs and are listed here for review.</p>
+        <div class="rule-cards" id="a-summary"></div>
+        <div class="table-wrap">
+          <table class="data">
+            <thead><tr><th>Severity</th><th>Rule</th><th>Transaction</th><th>Date (IST)</th><th class="num">Amount</th><th>Why it was flagged</th></tr></thead>
+            <tbody id="a-body"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="tab-panel" id="tab-quality" hidden>
+        <p class="note">Records rejected by the Pandas validation step during import. They are <strong>not</strong> in the database tables or the KPIs. This list covers the whole import and ignores the date filters.</p>
+        <div class="runs" id="q-runs"></div>
+        <div class="rule-cards" id="q-summary"></div>
+        <div class="table-wrap">
+          <table class="data">
+            <thead><tr><th>File</th><th class="num">Row</th><th>Record</th><th>Issue</th><th>Reason</th></tr></thead>
+            <tbody id="q-body"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="tab-panel definitions" id="tab-definitions" hidden>
+        <dl>
+          <dt>Total transactions</dt><dd>Every payment attempt in the date range, any status: <code>COUNT(*)</code>.</dd>
+          <dt>Gross transaction value (GTV)</dt><dd>Value of <em>successful</em> payments before refunds: <code>SUM(amount) WHERE status = 'success'</code>. Failed, pending and cancelled attempts are excluded because no money moved.</dd>
+          <dt>Refund amount</dt><dd>Sum of valid refunds against successful payments made in the range. Refunds are attributed to the <em>original payment date</em>, so they can never exceed that period's GTV.</dd>
+          <dt>Net transaction value</dt><dd><code>GTV − refund amount</code>. This is money kept by merchants, not our revenue.</dd>
+          <dt>Fee revenue</dt><dd>Processing fees the platform earns on successful payments: <code>SUM(fee_amount) WHERE status = 'success'</code>. UPI is zero-fee.</dd>
+          <dt>Net revenue</dt><dd><code>Fee revenue − fees reversed on refunds</code>, assuming fees are reversed pro-rata: <code>fee × refunded ÷ amount</code>.</dd>
+          <dt>Refund rate</dt><dd><code>Refund amount ÷ GTV</code> (by value). Also shown: refunded payments ÷ successful payments (by count).</dd>
+          <dt>Average transaction value (ATV)</dt><dd><code>GTV ÷ number of successful payments</code>.</dd>
+          <dt>Success rate</dt><dd><code>Successful ÷ (successful + failed)</code>. Pending and cancelled are left out because they have no final outcome or were abandoned by the user.</dd>
+          <dt>Dates</dt><dd>Stored as UTC <code>timestamptz</code>; days and months are grouped in India Standard Time (Asia/Kolkata). Both ends of the range are inclusive.</dd>
+        </dl>
+      </div>
+    </section>
+
+    <footer class="foot">
+      Data from PostgreSQL via FastAPI · <a href="/api/docs" target="_blank" rel="noopener">API docs</a>
+    </footer>
+  </main>
+
+  <dialog id="drawer" aria-labelledby="d-title">
+    <form method="dialog" class="drawer-head">
+      <h2 id="d-title">Transaction</h2>
+      <button value="close" aria-label="Close">✕</button>
+    </form>
+    <div id="d-body"></div>
+  </dialog>
+</body>
+</html>
