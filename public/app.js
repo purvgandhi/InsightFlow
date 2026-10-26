@@ -77,40 +77,55 @@ function writeUrl() {
 }
 
 // ---------- KPI tiles ----------
+const ICONS = {
+  count: '<path d="M4 6h16M4 12h16M4 18h10"/>',
+  wallet: '<path d="M3 7a2 2 0 0 1 2-2h13v4M3 7v10a2 2 0 0 0 2 2h15V9H5a2 2 0 0 1-2-2zM16 14h.01"/>',
+  refund: '<path d="M9 14L4 9l5-5M4 9h11a5 5 0 0 1 0 10h-3"/>',
+  percent: '<path d="M19 5L5 19M7 9a2 2 0 1 0 0-4 2 2 0 0 0 0 4zM17 19a2 2 0 1 0 0-4 2 2 0 0 0 0 4z"/>',
+  net: '<path d="M6 4h12M6 9h12M9 4c4 0 6 2 6 5s-2 5-6 5H6l9 7"/>',
+  revenue: '<path d="M3 17l6-6 4 4 8-8M15 7h6v6"/>',
+  avg: '<path d="M4 20V10M10 20V4M16 20v-8M3 20h18"/>',
+  check: '<path d="M20 6L9 17l-5-5"/>',
+};
 const KPI_TILES = [
-  { key: "total_transactions", label: "Total transactions", fmt: (k) => int.format(k.total_transactions),
+  { key: "gtv", label: "Gross transaction value", icon: "wallet", fmt: (k) => money(k.gtv), highlight: true,
+    hint: () => "Successful payments, before refunds", formula: "SUM(amount) WHERE status = 'success'" },
+  { key: "total_transactions", label: "Total transactions", icon: "count", fmt: (k) => int.format(k.total_transactions),
     hint: (k) => `${int.format(k.successful)} successful · ${int.format(k.failed)} failed · ${int.format(k.pending + k.cancelled)} pending/cancelled`,
     formula: "COUNT(*) of all payment attempts in the range, any status" },
-  { key: "gtv", label: "Gross transaction value", fmt: (k) => money(k.gtv), primary: true,
-    hint: () => "Successful payments, before refunds", formula: "SUM(amount) WHERE status = 'success'" },
-  { key: "refund_amount", label: "Refund amount", fmt: (k) => money(k.refund_amount),
+  { key: "refund_amount", label: "Refund amount", icon: "refund", fmt: (k) => money(k.refund_amount),
     hint: (k) => `${int.format(k.refunded_transactions)} payments refunded`, formula: "SUM(refund amount) for successful payments made in the range" },
-  { key: "refund_rate", label: "Refund rate", fmt: (k) => pct(k.refund_rate, 2),
+  { key: "refund_rate", label: "Refund rate", icon: "percent", fmt: (k) => pct(k.refund_rate, 2),
     hint: (k) => `By value · ${pct(k.refund_count_rate)} by count`, formula: "Refund amount ÷ GTV" },
-  { key: "net_transaction_value", label: "Net transaction value", fmt: (k) => money(k.net_transaction_value), primary: true,
+  { key: "net_transaction_value", label: "Net transaction value", icon: "net", fmt: (k) => money(k.net_transaction_value),
     hint: () => "GTV minus refunds", formula: "GTV − refund amount" },
-  { key: "net_revenue", label: "Net revenue (fees)", fmt: (k) => money2(k.net_revenue), primary: true,
+  { key: "net_revenue", label: "Net revenue (fees)", icon: "revenue", fmt: (k) => money2(k.net_revenue),
     hint: (k) => `${money(k.fee_revenue)} fees − ${money(k.fee_reversed)} reversed`, formula: "SUM(fee_amount) of successful payments − fees reversed pro-rata on refunds" },
-  { key: "aov", label: "Avg transaction value", fmt: (k) => money2(k.aov),
+  { key: "aov", label: "Avg transaction value", icon: "avg", fmt: (k) => money2(k.aov),
     hint: () => "Per successful payment", formula: "GTV ÷ number of successful payments" },
-  { key: "success_rate", label: "Success rate", fmt: (k) => pct(k.success_rate),
+  { key: "success_rate", label: "Success rate", icon: "check", fmt: (k) => pct(k.success_rate),
     hint: () => "Pending & cancelled excluded", formula: "successful ÷ (successful + failed)" },
 ];
+const icon = (name) => `<span class="icon" aria-hidden="true"><svg viewBox="0 0 24 24">${ICONS[name]}</svg></span>`;
 
 function renderKpiSkeleton() {
   $("#kpis").setAttribute("aria-busy", "true");
   $("#kpis").innerHTML = KPI_TILES.map((t) => `
-    <div class="kpi"><div class="label">${t.label}</div>
+    <div class="kpi${t.highlight ? " highlight" : ""}">${icon(t.icon)}<div class="label">${t.label}</div>
       <div class="skeleton" style="height:30px;width:70%"></div><div class="skeleton" style="height:12px;width:50%"></div></div>`).join("");
 }
 function renderKpis(k) {
   $("#kpis").setAttribute("aria-busy", "false");
   $("#kpis").innerHTML = KPI_TILES.map((t) => `
-    <div class="kpi${t.primary ? " primary" : ""}">
+    <div class="kpi${t.highlight ? " highlight" : ""}">
+      ${icon(t.icon)}
       <div class="label">${t.label}<span class="info" title="${esc(t.formula)}" aria-label="Formula: ${esc(t.formula)}">i</span></div>
       <div class="value">${t.fmt(k)}</div>
       <div class="hint">${esc(t.hint(k))}</div>
     </div>`).join("");
+  $("#hero-gtv").textContent = money(k.gtv);
+  const fmtDay = (d) => new Date(`${d}T00:00:00Z`).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric", timeZone: "UTC" });
+  $("#hero-range").textContent = `${fmtDay(state.filters.start)} – ${fmtDay(state.filters.end)} · ${int.format(k.successful)} successful payments`;
 }
 
 // ---------- charts ----------
@@ -145,6 +160,15 @@ function drawChart(id, config) {
   state.charts[id] = new Chart(document.getElementById(id), config);
 }
 
+function areaGradient(ctx) {
+  const { chart } = ctx;
+  if (!chart.chartArea) return "rgba(56, 189, 248, 0.2)";
+  const g = chart.ctx.createLinearGradient(0, chart.chartArea.top, 0, chart.chartArea.bottom);
+  g.addColorStop(0, "rgba(56, 189, 248, 0.38)");
+  g.addColorStop(1, "rgba(56, 189, 248, 0.02)");
+  return g;
+}
+
 function renderTrend(data) {
   state.lastTrend = data;
   const s = data.series;
@@ -169,9 +193,12 @@ function renderTrend(data) {
       type: "line",
       data: {
         labels: s.map((r) => `${bucketLabel(r.bucket, data.granularity)}${r.partial ? "*" : ""}`),
-        datasets: series.map((x) => ({
-          label: x.label, data: s.map((r) => r[x.key]), borderColor: x.color, backgroundColor: x.color,
-          borderWidth: 2, tension: 0.25, pointRadius: s.length > 40 ? 0 : 3, pointHoverRadius: 5,
+        datasets: series.map((x, i) => ({
+          label: x.label, data: s.map((r) => r[x.key]), borderColor: x.color, pointBackgroundColor: x.color,
+          // GTV is drawn as a soft light-blue area; refunds and net value stay as lines on the same ₹ axis.
+          fill: i === 0 ? "origin" : false,
+          backgroundColor: i === 0 ? areaGradient : x.color,
+          borderWidth: i === 0 ? 2.5 : 2, tension: 0.35, pointRadius: s.length > 40 ? 0 : 3, pointHoverRadius: 5,
           pointBorderColor: css("--surface"), pointBorderWidth: 2,
         })),
       },
@@ -206,21 +233,33 @@ function renderBreakdowns(b) {
     });
   }
   const m = b.by_payment_method;
+  const total = m.reduce((n, r) => n + r.gtv, 0);
+  $("#donut-total").textContent = total ? compactInr(total) : "—";
+  $(".donut-center").hidden = !m.length;
   setEmpty("method-chart", !m.length);
+  $("#method-legend").innerHTML = m.map((r) => `
+    <li><i style="background:${methodColor(r.payment_method)}"></i><span>${methodLabel(r.payment_method)}</span>
+      <span class="v">${money(r.gtv)}</span><span class="p">${pct(r.gtv / total)}</span></li>`).join("");
   if (m.length) {
     const o = baseOptions();
-    o.indexAxis = "y";
-    o.scales.x = { ...o.scales.y, ticks: { ...o.scales.y.ticks, maxRotation: 0, autoSkipPadding: 12 } };
-    o.scales.y = { grid: { display: false }, border: { color: css("--axis") }, ticks: { color: css("--ink-2") } };
-    o.plugins.tooltip.callbacks = { label: (c) => ` ${money(c.parsed.x)} · ${int.format(m[c.dataIndex].successful)} payments` };
+    delete o.scales;
+    o.cutout = "68%";
+    o.interaction = { mode: "nearest", intersect: true };
+    o.plugins.tooltip.callbacks = { label: (c) => ` ${money(c.parsed)} · ${pct(c.parsed / total)} · ${int.format(m[c.dataIndex].successful)} payments` };
     drawChart("method-chart", {
-      type: "bar",
-      data: { labels: m.map((r) => r.payment_method === "upi" ? "UPI" : cap(r.payment_method)),
-              datasets: [{ data: m.map((r) => r.gtv), backgroundColor: css("--series-1"), borderRadius: 4, borderSkipped: "start", barThickness: 22 }] },
+      type: "doughnut",
+      data: { labels: m.map((r) => methodLabel(r.payment_method)),
+              datasets: [{ data: m.map((r) => r.gtv), backgroundColor: m.map((r) => methodColor(r.payment_method)),
+                           borderColor: css("--surface"), borderWidth: 3, borderRadius: 6, hoverOffset: 6 }] },
       options: o,
     });
   }
 }
+
+// Each method keeps its own colour slot regardless of filters (colour follows the entity, not its rank).
+const METHOD_SLOT = { upi: "--series-1", card: "--series-2", netbanking: "--series-3", wallet: "--series-4" };
+const methodColor = (m) => css(METHOD_SLOT[m] || "--neutral");
+const methodLabel = (m) => (m === "upi" ? "UPI" : cap(m));
 
 // ---------- transactions table ----------
 const statusPill = (s) => `<span class="status s-${esc(s)}">${esc(cap(s))}</span>`;
@@ -234,9 +273,9 @@ async function loadTransactions(signal) {
     sort, order, page: t.page, page_size: t.pageSize }, signal);
   $("#t-body").innerHTML = data.items.length ? data.items.map((r) => `
     <tr class="clickable" data-id="${esc(r.transaction_id)}" tabindex="0">
-      <td class="mono">${esc(r.transaction_id)}</td><td>${dateTime(r.created_at)}</td><td class="mono">${esc(r.customer_id)}</td>
-      <td>${esc(r.merchant_id)}</td><td>${esc(r.payment_method === "upi" ? "UPI" : cap(r.payment_method))}</td><td>${statusPill(r.status)}</td>
-      <td class="num">${money2(r.amount)}</td><td class="num">${r.refunded_amount ? money2(r.refunded_amount) : "—"}</td>
+      <td><span class="id-pill">${esc(r.transaction_id)}</span></td><td>${dateTime(r.created_at)}</td><td><span class="id-pill">${esc(r.customer_id)}</span></td>
+      <td>${esc(r.merchant_id)}</td><td>${esc(methodLabel(r.payment_method))}</td><td>${statusPill(r.status)}</td>
+      <td class="num"><span class="amt-pill">${money2(r.amount)}</span></td><td class="num">${r.refunded_amount ? money2(r.refunded_amount) : "—"}</td>
       <td>${flagChips(r.flags)}</td>
     </tr>`).join("") : `<tr><td colspan="9"><div class="empty">No transactions match these filters</div></td></tr>`;
   const from = data.total ? (data.page - 1) * data.page_size + 1 : 0;
@@ -435,15 +474,28 @@ for (const body of ["#t-body", "#a-body"]) {
   $(body).addEventListener("keydown", (e) => { const tr = e.target.closest("tr[data-id]"); if (tr && e.key === "Enter") openDrilldown(tr.dataset.id); });
 }
 
-document.querySelectorAll("[data-tab]").forEach((b) => b.addEventListener("click", () => {
-  document.querySelectorAll("[data-tab]").forEach((x) => { x.classList.toggle("active", x === b); x.setAttribute("aria-selected", x === b); });
-  document.querySelectorAll(".tab-panel").forEach((p) => { p.hidden = p.id !== `tab-${b.dataset.tab}`; });
+function openTab(name) {
+  document.querySelectorAll("[data-tab]").forEach((x) => { const on = x.dataset.tab === name; x.classList.toggle("active", on); x.setAttribute("aria-selected", on); });
+  document.querySelectorAll(".tab-panel").forEach((p) => { p.hidden = p.id !== `tab-${name}`; });
+}
+document.querySelectorAll("[data-tab]").forEach((b) => b.addEventListener("click", () => openTab(b.dataset.tab)));
+
+// Sidebar: highlight the clicked item; items pointing at the records card also switch its tab.
+document.querySelectorAll(".nav a").forEach((a) => a.addEventListener("click", () => {
+  document.querySelectorAll(".nav a").forEach((x) => x.classList.toggle("active", x === a));
+  if (a.dataset.openTab) openTab(a.dataset.openTab);
 }));
 
-// Re-draw charts with the right palette when the OS switches light/dark.
-matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
-  if (state.lastTrend) renderTrend(state.lastTrend);
-  if (state.lastBreakdowns) renderBreakdowns(state.lastBreakdowns);
+// Top-bar search drives the transactions table search.
+$("#g-search").addEventListener("input", (e) => {
+  $("#t-search").value = e.target.value;
+  $("#t-search").dispatchEvent(new Event("input"));
+});
+$("#g-search").addEventListener("keydown", (e) => {
+  if (e.key === "Enter") { openTab("transactions"); $("#records").scrollIntoView(); }
+});
+document.addEventListener("keydown", (e) => {
+  if (e.key === "/" && !["INPUT", "SELECT", "TEXTAREA"].includes(document.activeElement.tagName)) { e.preventDefault(); $("#g-search").focus(); }
 });
 
 window.addEventListener("DOMContentLoaded", () => {
